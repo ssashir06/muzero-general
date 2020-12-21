@@ -1,5 +1,6 @@
 import datetime
 import os
+import copy
 
 import numpy
 import torch
@@ -336,36 +337,45 @@ class ScoreFour:
         return False
 
     def expert_action(self):
-        legal_actions = self.legal_actions()
+        las = self.legal_actions()
 
         # simulate enemy
         enemys = []
-        for action in legal_actions:
+        for action in las:
             if self.is_denger_action_of_enemy(action):
                 enemys.append(action)
         if len(enemys) > 0:
             return random.choice(enemys)
 
         # find good position
-        # TODO
-        return random.choice(legal_actions)
+        candidates = []
+        point_max = None
+        for action in las:
+            point = self.get_position_point(action)
+            candidates.append([action, point])
+            if point_max is None or point > point_max:
+                point_max = point
+        
+        return random.choice(
+            [ap[0] for ap in candidates if ap[1] == point_max]
+        )
         
     def is_denger_action_of_enemy(self, action):
-        board_copy = self.board
+        board_copy = copy.deepcopy(self.board)
 
         # simulate enemy
         x = action // 4
         y = action % 4
         z = (
-            0 if self.board[x, y, 0] == 0 else
-            1 if self.board[x, y, 1] == 0 else
-            2 if self.board[x, y, 2] == 0 else
-            3 if self.board[x, y, 3] == 0 else
+            0 if board_copy[x, y, 0] == 0 else
+            1 if board_copy[x, y, 1] == 0 else
+            2 if board_copy[x, y, 2] == 0 else
+            3 if board_copy[x, y, 3] == 0 else
             -1
         )
         if z == -1:
             return False
-        self.board[x, y, z] = -self.player
+        board_copy[x, y, z] = -self.player
 
         for [(cx, cy, cz), poss] in self.winlocs:
             for xyz in poss:
@@ -380,6 +390,41 @@ class ScoreFour:
                 if count == 4:
                     return True
         return False
+
+    def get_position_point(self, action):
+        board_copy = copy.deepcopy(self.board)
+
+        # simulate step
+        x = action // 4
+        y = action % 4
+        z = (
+            0 if board_copy[x, y, 0] == 0 else
+            1 if board_copy[x, y, 1] == 0 else
+            2 if board_copy[x, y, 2] == 0 else
+            3 if board_copy[x, y, 3] == 0 else
+            -1
+        )
+        if z == -1:
+            return False
+        board_copy[x, y, z] = self.player
+
+        count_sum = 0
+        for [(cx, cy, cz), poss] in self.winlocs:
+            for xyz in poss:
+                count = 0
+                (x, y, z) = (xyz[0], xyz[1], xyz[2])
+                for i in range(0, 4):
+                    if board_copy[x, y, z] == self.player:
+                        count+=1
+                    elif board_copy[x, y, z] == -self.player:
+                        count-=1
+                    x += cx
+                    y += cy
+                    z += cz
+                count_sum += count ** 2
+
+        return count_sum
+
 
     def render(self):
         print(self.board[::-1])
