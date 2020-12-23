@@ -249,7 +249,7 @@ class Game(AbstractGame):
 class ScoreFour:
     def __init__(self):
         self.board = numpy.zeros((4, 4, 4), dtype="int32")
-        self.player = 1
+        self.player = random.choice([-1, 1])
         self.winlocs = []
         
         # create judgement values
@@ -283,7 +283,7 @@ class ScoreFour:
 
     def reset(self):
         self.board = numpy.zeros((4, 4, 4), dtype="int32")
-        self.player = 1
+        self.player = random.choice([-1, 1])
         return self.get_observation()
 
     def step(self, action):
