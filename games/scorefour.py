@@ -19,7 +19,7 @@ class MuZeroConfig:
 
 
         ### Game
-        self.observation_shape = (3, 4, 16)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
+        self.observation_shape = (1, 1, 205)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
         self.action_space = list(range(16))  # Fixed list of all possible actions. You should only edit the length
         self.players = list(range(2))  # List of players. You should only edit the length
         self.stacked_observations = 0  # Number of previous observations and previous actions to add to the current observation
@@ -77,7 +77,7 @@ class MuZeroConfig:
         self.results_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../results", os.path.basename(__file__)[:-3], datetime.datetime.now().strftime("%Y-%m-%d--%H-%M-%S"))  # Path to store the model weights and TensorBoard logs
         self.save_model = True  # Save the checkpoint in results_path as model.checkpoint
         self.training_steps = 1000000  # Total number of training steps (ie weights update according to a batch)
-        self.batch_size = 20  # Number of parts of games to train on at each training step
+        self.batch_size = 6  # Number of parts of games to train on at each training step
         self.checkpoint_interval = 10  # Number of training steps before using the model for self-playing
         self.value_loss_weight = 0.25  # Scale the value loss to avoid overfitting of the value function, paper recommends 0.25 (See paper appendix Reanalyze)
         self.train_on_gpu = torch.cuda.is_available()  # Train on GPU if available
@@ -302,15 +302,36 @@ class ScoreFour:
 
         reward = 1 if self.have_winner() else 0
 
+        observation = self.get_observation()
+
         self.player *= -1
 
-        return self.get_observation(), reward, done
+        return observation, reward, done
 
     def get_observation(self):
-        board_player1 = numpy.where(self.board == 1, 1, 0).transpose(2,0,1).reshape(4,-1)
-        board_player2 = numpy.where(self.board == -1, 1, 0).transpose(2,0,1).reshape(4,-1)
-        board_to_play = numpy.full((4, 4, 4), self.player).transpose(2,0,1).reshape(4,-1)
-        return numpy.array([board_player1, board_player2, board_to_play], dtype="int32")
+        board_to_play = [self.player]
+        board_mine = numpy.where(self.board == self.player, 1, 0).reshape(1,-1)
+        board_enemy = numpy.where(self.board == -self.player, 1, 0).reshape(1,-1)
+        
+        winloc_evaluate = numpy.zeros(76, dtype="int32")
+        winloc_pos = 0
+        for [(cx, cy, cz), poss] in self.winlocs:
+            for xyz in poss:
+                count = 0
+                (x, y, z) = (xyz[0], xyz[1], xyz[2])
+                for i in range(0, 4):
+                    count += self.board[x, y, z]
+                    x += cx
+                    y += cy
+                    z += cz
+                winloc_evaluate[winloc_pos] = count * self.player
+                winloc_pos += 1
+
+        return numpy.reshape(numpy.concatenate((
+            board_to_play,
+            board_mine,
+            board_enemy,
+            winloc_evaluate), axis=None), (1, 1, 205))
 
     def legal_actions(self):
         legal = []
