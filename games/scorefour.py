@@ -49,7 +49,7 @@ class MuZeroConfig:
 
 
         ### Network
-        self.network = "resnet"  # "resnet" / "fullyconnected"
+        self.network = "fullyconnected"  # "resnet" / "fullyconnected"
         self.support_size = 10  # Value and reward are scaled (with almost sqrt) and encoded on a vector with a range of -support_size to support_size. Choose it so that support_size <= sqrt(max(abs(discounted reward)))
 
         # Residual Network
@@ -302,11 +302,9 @@ class ScoreFour:
 
         reward = 1 if self.have_winner() else 0
 
-        observation = self.get_observation()
-
         self.player *= -1
 
-        return observation, reward, done
+        return self.get_observation(), reward, done
 
     def get_observation(self):
         board_to_play = [self.player]
