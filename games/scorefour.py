@@ -19,7 +19,7 @@ class MuZeroConfig:
 
 
         ### Game
-        self.observation_shape = (1, 1, 205)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
+        self.observation_shape = (1, 1, 221)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
         self.action_space = list(range(16))  # Fixed list of all possible actions. You should only edit the length
         self.players = list(range(2))  # List of players. You should only edit the length
         self.stacked_observations = 0  # Number of previous observations and previous actions to add to the current observation
@@ -311,6 +311,7 @@ class ScoreFour:
         board_mine = numpy.where(self.board == self.player, 1, 0).reshape(1,-1)
         board_enemy = numpy.where(self.board == -self.player, 1, 0).reshape(1,-1)
         
+        # blocks evaluations
         winloc_evaluate = numpy.zeros(76, dtype="int32")
         winloc_pos = 0
         for [(cx, cy, cz), poss] in self.winlocs:
@@ -325,11 +326,20 @@ class ScoreFour:
                 winloc_evaluate[winloc_pos] = count * self.player
                 winloc_pos += 1
 
+        # legal actions
+        legal = numpy.zeros(16, dtype="int32")
+        for i in range(16):
+            x = i // 4
+            y = i % 4
+            legal[i] = 1 if self.board[x, y, 3] == 0 else -1
+
         return numpy.reshape(numpy.concatenate((
             board_to_play,
             board_mine,
             board_enemy,
-            winloc_evaluate), axis=None), (1, 1, 205))
+            winloc_evaluate,
+            legal
+            ), axis=None), (1, 1, 221))
 
     def legal_actions(self):
         legal = []
