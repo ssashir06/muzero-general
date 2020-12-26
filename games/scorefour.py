@@ -308,8 +308,8 @@ class ScoreFour:
 
     def get_observation(self):
         board_to_play = [self.player]
-        board_mine = numpy.where(self.board == self.player, 1, 0).reshape(1,-1)
-        board_enemy = numpy.where(self.board == -self.player, 1, 0).reshape(1,-1)
+        board_mine = [n * self.player for n in numpy.reshape(self.board, (1, -1))]
+        board_enemy = [n * -self.player for n in numpy.reshape(self.board, (1, -1))]
         
         # blocks evaluations
         winloc_evaluate = numpy.zeros(76, dtype="int32")
