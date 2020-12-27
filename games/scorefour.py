@@ -255,29 +255,29 @@ class ScoreFour:
         
         # create judgement values
         directions = [
-            [0, 0, 1],
-            [0, 1, 0],
-            [0, 1, 1],
-            [0, 1, -1],
-            [1, 0, 0],
-            [1, 0, 1],
-            [1, 0, -1],
-            [1, 1, 0],
-            [1, 1, 1],
-            [1, 1, -1],
-            [1, -1, 0],
-            [1, -1, 1],
-            [1, -1, -1],
+            (0, 0, 1),
+            (0, 1, 0),
+            (0, 1, 1),
+            (0, 1, -1),
+            (1, 0, 0),
+            (1, 0, 1),
+            (1, 0, -1),
+            (1, 1, 0),
+            (1, 1, 1),
+            (1, 1, -1),
+            (1, -1, 0),
+            (1, -1, 1),
+            (1, -1, -1),
         ]
-        for direction in directions:
-            cx = direction[0]
-            cy = direction[1]
-            cz = direction[2]
+        for (cx, cy, cz) in directions:
             ax = [0,1,2,3] if cx == 0 else [0] if cx == 1 else [3]
             ay = [0,1,2,3] if cy == 0 else [0] if cy == 1 else [3]
             az = [0,1,2,3] if cz == 0 else [0] if cz == 1 else [3]
             poss = numpy.array(numpy.meshgrid(ax, ay, az)).T.reshape(-1,3)
-            self.winlocs.append([(cx, cy, cz), poss])
+            for (bx, by, bz) in poss:
+                self.winlocs.append(
+                    [(bx + cx*i, by + cy*i, bz + cz*i) for i in range(0,4)]
+                )
 
     def to_play(self):
         return 0 if self.player == 1 else 1
@@ -293,11 +293,24 @@ class ScoreFour:
 
         done = self.have_winner() or len(self.legal_actions()) == 0
 
-        reward = 1 if self.have_winner() else 0
+        reward = 1 if self.have_winner() else self.bonus_point(action)
 
         self.player *= -1
 
         return self.get_observation(), reward, done
+
+    def bonus_point(self, action):
+        bonus = 0
+        (ax, ay, az) = ScoreFour.action_to_3d(action)
+        
+        # Preventing enemy's win
+        for i, poss in enumerate(self.winlocs):
+            if len([1 for (px, py, pz) in poss if (px, py, pz) == (ax, ay, az)]) > 0:
+                if sum([1 for (px, py, pz) in poss if self.board[px, py, pz] == -self.player]) == 3:
+                    bonus += 0.25
+                    break
+        
+        return bonus
 
     def get_observation(self):
         board_to_play = [self.player]
@@ -312,18 +325,9 @@ class ScoreFour:
         
         # blocks evaluations
         winloc_evaluate = numpy.zeros(76, dtype="int32")
-        winloc_pos = 0
-        for [(cx, cy, cz), poss] in self.winlocs:
-            for xyz in poss:
-                count = 0
-                (x, y, z) = (xyz[0], xyz[1], xyz[2])
-                for i in range(0, 4):
-                    count += self.board[x, y, z]
-                    x += cx
-                    y += cy
-                    z += cz
-                winloc_evaluate[winloc_pos] = count * self.player
-                winloc_pos += 1
+        for i, poss in enumerate(self.winlocs):
+            count = sum([self.board[px, py, pz] for (px, py, pz) in poss])
+            winloc_evaluate[i] = count * self.player
 
         return numpy.reshape(numpy.concatenate((
             board_to_play,
@@ -349,27 +353,24 @@ class ScoreFour:
         )
 
     def have_winner(self):
-        for [(cx, cy, cz), poss] in self.winlocs:
-            for xyz in poss:
-                count = 0
-                (x, y, z) = (xyz[0], xyz[1], xyz[2])
-                for i in range(0, 4):
-                    if self.board[x, y, z] == self.player:
-                        count+=1
-                    x += cx
-                    y += cy
-                    z += cz
-                if count == 4:
-                    return True
+        for i, poss in enumerate(self.winlocs):
+            count = sum([1 for (px, py, pz) in poss if self.board[px, py, pz] == self.player])
+            if count == 4:
+                return True
         return False
 
     def expert_action(self):
         las = self.legal_actions()
 
+        # find winning point
+        for action in las:
+            if self.is_winning_action(action, self.player):
+                return action
+
         # simulate enemy
         enemys = []
         for action in las:
-            if self.is_denger_action_of_enemy(action):
+            if self.is_winning_action(action, -self.player):
                 enemys.append(action)
         if len(enemys) > 0:
             return random.choice(enemys)
@@ -378,7 +379,7 @@ class ScoreFour:
         candidates = []
         point_max = None
         for action in las:
-            point = self.get_position_point(action)
+            point = self.get_position_importance(action)
             candidates.append([action, point])
             if point_max is None or point > point_max:
                 point_max = point
@@ -386,29 +387,21 @@ class ScoreFour:
         return random.choice(
             [ap[0] for ap in candidates if ap[1] == point_max]
         )
-        
-    def is_denger_action_of_enemy(self, action):
+
+    def is_winning_action(self, action, player):
         board_copy = copy.deepcopy(self.board)
 
         # simulate enemy
         (x, y, z) = ScoreFour.action_to_3d(action)
-        board_copy[x, y, z] = -self.player
+        board_copy[x, y, z] = player
 
-        for [(cx, cy, cz), poss] in self.winlocs:
-            for xyz in poss:
-                count = 0
-                (x, y, z) = (xyz[0], xyz[1], xyz[2])
-                for i in range(0, 4):
-                    if board_copy[x, y, z] == -self.player:
-                        count+=1
-                    x += cx
-                    y += cy
-                    z += cz
-                if count == 4:
-                    return True
+        for i, poss in enumerate(self.winlocs):
+            count = sum([1 for (px, py, pz) in poss if board_copy[px, py, pz] == player])
+            if count == 4:
+                return True
         return False
 
-    def get_position_point(self, action):
+    def get_position_importance(self, action):
         board_copy = copy.deepcopy(self.board)
 
         # simulate step
@@ -416,19 +409,12 @@ class ScoreFour:
         board_copy[x, y, z] = self.player
 
         count_sum = 0
-        for [(cx, cy, cz), poss] in self.winlocs:
-            for xyz in poss:
-                count = 0
-                (x, y, z) = (xyz[0], xyz[1], xyz[2])
-                for i in range(0, 4):
-                    if board_copy[x, y, z] == self.player:
-                        count+=1
-                    elif board_copy[x, y, z] == -self.player:
-                        count-=1
-                    x += cx
-                    y += cy
-                    z += cz
-                count_sum += count ** 2
+        for i, poss in enumerate(self.winlocs):
+            count = (
+                sum([1 for (px, py, pz) in poss if board_copy[px, py, pz] == self.player])
+                - sum([1 for (px, py, pz) in poss if board_copy[px, py, pz] == -self.player])
+            )
+            count_sum += count ** 2
 
         return count_sum
 
