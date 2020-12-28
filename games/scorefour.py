@@ -109,7 +109,7 @@ class MuZeroConfig:
         ### Adjust the self play / training ratio to avoid over/underfitting
         self.self_play_delay = 0  # Number of seconds to wait after each played game
         self.training_delay = 0  # Number of seconds to wait after each training step
-        self.ratio = None  # Desired training steps per self played step ratio. Equivalent to a synchronous version, training can take much longer. Set it to None to disable it
+        self.ratio = 1  # Desired training steps per self played step ratio. Equivalent to a synchronous version, training can take much longer. Set it to None to disable it
 
 
     def visit_softmax_temperature_fn(self, trained_steps):
@@ -309,7 +309,7 @@ class ScoreFour:
                 if sum([1 for (px, py, pz) in poss if self.board[px, py, pz] == -self.player]) == 3:
                     bonus += 0.25
                     break
-        
+
         # Scoreing items
         for i, poss in enumerate(self.winlocs):
             if all([(self.board[px, py, pz] in [0, self.player]) for (px, py, pz) in poss]):
