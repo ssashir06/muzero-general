@@ -35,7 +35,7 @@ class MuZeroConfig:
         self.selfplay_on_gpu = False
         self.max_moves = 64  # Maximum number of moves if game is not finished before
         self.num_simulations = 256  # Number of future moves self-simulated
-        self.discount = 0.965  # Chronological discount of the reward
+        self.discount = 0.989018025695335  # Chronological discount of the reward
         self.temperature_threshold = None  # Number of moves before dropping the temperature given by visit_softmax_temperature_fn to 0 (ie selecting the best action). If None, visit_softmax_temperature_fn is used every time
 
         # Root prior exploration noise
@@ -87,7 +87,7 @@ class MuZeroConfig:
         self.momentum = 0.9  # Used only if optimizer is SGD
 
         # Exponential learning rate schedule
-        self.lr_init = 0.0001942  # Initial learning rate
+        self.lr_init = 0.00019982233882221204  # Initial learning rate
         self.lr_decay_rate = 1  # Set it to 1 to use a constant learning rate
         self.lr_decay_steps = 10000
 
