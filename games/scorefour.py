@@ -305,10 +305,17 @@ class ScoreFour:
         
         # Preventing enemy's win
         for i, poss in enumerate(self.winlocs):
-            if len([1 for (px, py, pz) in poss if (px, py, pz) == (ax, ay, az)]) > 0:
+            if any([(ax, ay, az) == p for p in poss]):
                 if sum([1 for (px, py, pz) in poss if self.board[px, py, pz] == -self.player]) == 3:
                     bonus += 0.25
                     break
+        
+        # Scoreing items
+        for i, poss in enumerate(self.winlocs):
+            if all([(self.board[px, py, pz] in [0, self.player]) for (px, py, pz) in poss]):
+                bonus += 0.0100
+            if all([(self.board[px, py, pz] in [0, -self.player]) for (px, py, pz) in poss]):
+                bonus -= 0.0025
         
         return bonus
 
