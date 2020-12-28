@@ -19,7 +19,7 @@ class MuZeroConfig:
 
 
         ### Game
-        self.observation_shape = (1, 1, 269)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
+        self.observation_shape = (5, 4, 16)  # Dimensions of the game observation, must be 3D (channel, height, width). For a 1D array, please reshape it to (1, 1, length of array)
         self.action_space = list(range(64))  # Fixed list of all possible actions. You should only edit the length
         self.players = list(range(2))  # List of players. You should only edit the length
         self.stacked_observations = 0  # Number of previous observations and previous actions to add to the current observation
@@ -209,7 +209,7 @@ class Game(AbstractGame):
                 )
                 las = self.legal_actions()
                 def f(act):
-                    (_x, _y, _) = ScoreFour.action_to_3d(act)
+                    (_x, _y, _) = ScoreFour.convert_action_to_xyz(act)
                     return x-1 == _x and y-1 == _y
 
                 match = [act for act in las if f(act)]
@@ -243,7 +243,7 @@ class Game(AbstractGame):
         Returns:
             String representing the action.
         """
-        (x, y, z) = ScoreFour.action_to_3d(action_number)
+        (x, y, z) = ScoreFour.convert_action_to_xyz(action_number)
         return f"Play X {x+1}, Y {y+1}, Z {z+1}"
 
 
@@ -288,7 +288,7 @@ class ScoreFour:
         return self.get_observation()
 
     def step(self, action):
-        (x, y, z) = ScoreFour.action_to_3d(action)
+        (x, y, z) = ScoreFour.convert_action_to_xyz(action)
         self.board[x, y, z] = self.player
 
         done = self.have_winner() or len(self.legal_actions()) == 0
@@ -301,7 +301,7 @@ class ScoreFour:
 
     def bonus_point(self, action):
         bonus = 0
-        (ax, ay, az) = ScoreFour.action_to_3d(action)
+        (ax, ay, az) = ScoreFour.convert_action_to_xyz(action)
         
         # Preventing enemy's win
         for i, poss in enumerate(self.winlocs):
@@ -313,44 +313,51 @@ class ScoreFour:
         return bonus
 
     def get_observation(self):
-        board_to_play = [self.player]
-        board_mine = [n * self.player for n in numpy.reshape(self.board, (1, -1))]
-        board_enemy = [n * -self.player for n in numpy.reshape(self.board, (1, -1))]
+        board_mine = numpy.where(self.board == self.player, 1, 0)
+        board_enemy = numpy.where(self.board == -self.player, 1, 0)
 
         # legal actions
         legal = self.legal_actions()
-        board_legal = numpy.zeros(64, dtype="int32")
+        board_legal = numpy.zeros((4, 4, 4), dtype="int32")
         for i in legal:
-            board_legal[i] = 1
+            (px, py, pz) = ScoreFour.convert_action_to_xyz(i)
+            board_legal[px, py, pz] = 1
         
         # blocks evaluations
-        winloc_evaluate = numpy.zeros(76, dtype="int32")
+        winloc_evaluate_mine = numpy.zeros((4, 4, 4), dtype="float32")
+        winloc_evaluate_enemy = numpy.zeros((4, 4, 4), dtype="float32")
         for i, poss in enumerate(self.winlocs):
-            count = sum([self.board[px, py, pz] for (px, py, pz) in poss])
-            winloc_evaluate[i] = count * self.player
+            count_mine = sum([1 for (px, py, pz) in poss if self.board[px, py, pz] == self.player])
+            count_enemy = sum([1 for (px, py, pz) in poss if self.board[px, py, pz] == -self.player])
+            for (px, py, pz) in poss:
+                winloc_evaluate_mine[px, py, pz] += count_mine / 16
+                winloc_evaluate_enemy[px, py, pz] += count_enemy / 16
 
-        return numpy.reshape(numpy.concatenate((
-            board_to_play,
-            board_mine,
-            board_enemy,
-            board_legal,
-            winloc_evaluate
-            ), axis=None), (1, 1, 269))
+        return [
+            numpy.reshape(board_mine, (4, 16)),
+            numpy.reshape(board_enemy, (4, 16)),
+            numpy.reshape(board_legal, (4, 16)),
+            numpy.reshape(winloc_evaluate_mine, (4, 16)),
+            numpy.reshape(winloc_evaluate_enemy, (4, 16)),
+        ]
 
     def legal_actions(self):
         legal = []
         for i in range(64):
-            (x, y, z) = ScoreFour.action_to_3d(i)
+            (x, y, z) = ScoreFour.convert_action_to_xyz(i)
             if self.board[x, y, z] == 0 and (z == 0 or self.board[x, y, z-1] != 0):
                 legal.append(i)
         return legal
     
-    def action_to_3d(action):
+    def convert_action_to_xyz(action):
         return (
             action // 16,
             (action // 4) % 4,
             action % 4
         )
+    
+    def convert_xyz_to_action(x, y, z):
+        return x * 16 + y * 4 + z
 
     def have_winner(self):
         for i, poss in enumerate(self.winlocs):
@@ -392,7 +399,7 @@ class ScoreFour:
         board_copy = copy.deepcopy(self.board)
 
         # simulate enemy
-        (x, y, z) = ScoreFour.action_to_3d(action)
+        (x, y, z) = ScoreFour.convert_action_to_xyz(action)
         board_copy[x, y, z] = player
 
         for i, poss in enumerate(self.winlocs):
@@ -405,7 +412,7 @@ class ScoreFour:
         board_copy = copy.deepcopy(self.board)
 
         # simulate step
-        (x, y, z) = ScoreFour.action_to_3d(action)
+        (x, y, z) = ScoreFour.convert_action_to_xyz(action)
         board_copy[x, y, z] = self.player
 
         count_sum = 0
