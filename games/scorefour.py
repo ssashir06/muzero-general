@@ -4,7 +4,6 @@ import copy
 
 import numpy
 import torch
-import random
 
 from .abstract_game import AbstractGame
 
@@ -26,7 +25,7 @@ class MuZeroConfig:
 
         # Evaluate
         self.muzero_player = 0  # Turn Muzero begins to play (0: MuZero plays first, 1: MuZero plays second)
-        self.opponent = "expert"  # Hard coded agent that MuZero faces to assess his progress in multiplayer games. It doesn't influence training. None, "random" or "expert" if implemented in the Game class
+        self.opponent = "random"  # Hard coded agent that MuZero faces to assess his progress in multiplayer games. It doesn't influence training. None, "random" or "expert" if implemented in the Game class
 
 
 
@@ -35,7 +34,7 @@ class MuZeroConfig:
         self.selfplay_on_gpu = False
         self.max_moves = 64  # Maximum number of moves if game is not finished before
         self.num_simulations = 256  # Number of future moves self-simulated
-        self.discount = 0.989018025695335  # Chronological discount of the reward
+        self.discount = 0.9902979654341393  # Chronological discount of the reward
         self.temperature_threshold = None  # Number of moves before dropping the temperature given by visit_softmax_temperature_fn to 0 (ie selecting the best action). If None, visit_softmax_temperature_fn is used every time
 
         # Root prior exploration noise
@@ -87,7 +86,7 @@ class MuZeroConfig:
         self.momentum = 0.9  # Used only if optimizer is SGD
 
         # Exponential learning rate schedule
-        self.lr_init = 0.00019982233882221204  # Initial learning rate
+        self.lr_init = 0.010146784010607151  # Initial learning rate
         self.lr_decay_rate = 1  # Set it to 1 to use a constant learning rate
         self.lr_decay_steps = 10000
 
@@ -250,7 +249,7 @@ class Game(AbstractGame):
 class ScoreFour:
     def __init__(self):
         self.board = numpy.zeros((4, 4, 4), dtype="int32")
-        self.player = random.choice([-1, 1])
+        self.player = numpy.random.choice([-1, 1])
         self.winlocs = []
         
         # create judgement values
@@ -284,7 +283,7 @@ class ScoreFour:
 
     def reset(self):
         self.board = numpy.zeros((4, 4, 4), dtype="int32")
-        self.player = random.choice([-1, 1])
+        self.player = numpy.random.choice([-1, 1])
         return self.get_observation()
 
     def step(self, action):
@@ -387,7 +386,7 @@ class ScoreFour:
             if self.is_winning_action(action, -self.player):
                 enemys.append(action)
         if len(enemys) > 0:
-            return random.choice(enemys)
+            return numpy.random.choice(enemys)
 
         # find good position
         candidates = []
@@ -398,7 +397,7 @@ class ScoreFour:
             if point_max is None or point > point_max:
                 point_max = point
         
-        return random.choice(
+        return numpy.random.choice(
             [ap[0] for ap in candidates if ap[1] == point_max]
         )
 
